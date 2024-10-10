@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @NoArgsConstructor
 public class BalanceResponse {
+
     @JsonProperty("card number")
     private String cardNumber;
 

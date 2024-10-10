@@ -5,7 +5,7 @@ import com.alex.d.springbootatm.repository.BankCardRepository;
 import com.alex.d.springbootatm.response.ErrorResponse;
 import com.alex.d.springbootatm.response.TransferResponse;
 import com.alex.d.springbootatm.service.ATMService;
-import com.alex.d.springbootatm.service.LuhnsAlgorithm;
+import com.alex.d.springbootatm.service.KafkaProducerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -32,10 +32,11 @@ import java.util.Optional;
 public class TransactionController {
 
     @Autowired
-    private  BankCardRepository bankCardRepository;
+    private BankCardRepository bankCardRepository;
     @Autowired
-    private  ATMService atmService;
-
+    private ATMService atmService;
+    @Autowired
+    private KafkaProducerService kafkaProducerService;
 
 
     @PostMapping("/transfer")
@@ -61,22 +62,20 @@ public class TransactionController {
         Optional<BankCardModel> senderCard = bankCardRepository.findByCardNumber(senderCardNumber);
         Optional<BankCardModel> recipientCard = bankCardRepository.findByCardNumber(recipientCardNumber);
 
+        if (senderCard.isEmpty()) {
+            log.error("Card number not found {}", senderCard);
+            ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "404", "Card number not found", "/transfer/" + senderCardNumber);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        } else if (recipientCard.isEmpty()) {
+            log.error("Card number not found {}", recipientCard);
+            ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "404", "Card number not found", "/transfer/" + recipientCardNumber);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        }
+
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             log.error("Invalid transfer amount: {}", amount);
-            ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "400", "Invalid deposit amount", "/deposit/" + amount);
+            ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "400", "Invalid deposit amount", "/transfer/" + amount);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
-        }
-
-        if (!LuhnsAlgorithm.isCorrectNumber(senderCardNumber)) {
-            log.error("Sender card not found: {}", senderCardNumber);
-            ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "404", "Sender card not found", "/transfer/" + senderCardNumber);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
-        }
-
-        if (!LuhnsAlgorithm.isCorrectNumber(recipientCardNumber)) {
-            log.error("Recipient card not found: {}", recipientCardNumber);
-            ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "404", "Recipient card not found", "/transfer/" + recipientCardNumber);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
         }
 
         BigDecimal senderBalance = senderCard.get().getBalance();
@@ -91,7 +90,7 @@ public class TransactionController {
 
         atmService.sendTransaction(senderCard, recipientCard, amount);
         log.info("Transactions of {} from card {} to card {} was successful.", amount, senderCardNumber, recipientCardNumber);
-
+        kafkaProducerService.sendMessage("atm-topic", "Transactions of " + amount + " from card " + senderCardNumber + " to card " + recipientCardNumber + " was successful.");
 
         TransferResponse response = new TransferResponse(senderCardNumber, recipientCardNumber, amount, senderBalance.subtract(amount), recipientBalance.add(amount));
 

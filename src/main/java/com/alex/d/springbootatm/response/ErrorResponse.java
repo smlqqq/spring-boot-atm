@@ -15,6 +15,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @Schema(description = "Error response")
 public class ErrorResponse {
+
     @Schema(description = "Timestamp of the error", example = "2024-03-04T12:00:00Z")
     @JsonProperty("timestamp")
     private Instant timestamp;

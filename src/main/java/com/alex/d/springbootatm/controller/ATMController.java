@@ -7,7 +7,7 @@ import com.alex.d.springbootatm.response.DepositResponse;
 import com.alex.d.springbootatm.response.ErrorResponse;
 import com.alex.d.springbootatm.response.WithdrawResponse;
 import com.alex.d.springbootatm.service.ATMService;
-import com.alex.d.springbootatm.service.LuhnsAlgorithm;
+import com.alex.d.springbootatm.service.KafkaProducerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -33,9 +33,10 @@ public class ATMController {
 
     @Autowired
     private ATMService atmService;
-
     @Autowired
     private BankCardRepository bankCardRepository;
+    @Autowired
+    private KafkaProducerService kafkaProducerService;
 
 
     @Operation(
@@ -54,12 +55,6 @@ public class ATMController {
     @GetMapping("/balance/{cardNumber}")
     public ResponseEntity getBalance(@PathVariable String cardNumber) {
 
-        if (!LuhnsAlgorithm.isCorrectNumber(cardNumber)) {
-            log.error("Invalid credit card number {}", cardNumber);
-            ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "400", "Invalid credit card number.", "/balance/" + cardNumber);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
-        }
-
         Optional<BankCardModel> card = bankCardRepository.findByCardNumber(cardNumber);
         if (card.isEmpty()) {
             log.error("Card not found for number: {}", cardNumber);
@@ -69,6 +64,7 @@ public class ATMController {
 
         BigDecimal balance = atmService.checkBalanceByCardNumber(cardNumber);
         log.info("Card: {} Balance: {}", cardNumber, balance);
+        kafkaProducerService.sendMessage("atm-topic", "Card: " + cardNumber + " Balance: " + balance);
 
         BalanceResponse response = new BalanceResponse(cardNumber, balance);
 
@@ -94,12 +90,6 @@ public class ATMController {
             @Parameter(description = "Recipient card number", required = true) @RequestParam("cardNumber") String cardNumber,
             @Parameter(description = "Amount to deposit", required = true) @RequestParam("amount") BigDecimal amount) {
 
-        if (!LuhnsAlgorithm.isCorrectNumber(cardNumber)) {
-            log.error("Invalid credit card number {}", cardNumber);
-            ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "400", "Invalid credit card number.", "/deposit/" + cardNumber);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
-        }
-
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             log.error("Invalid deposit amount: {}", amount);
             ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "400", "Invalid deposit amount", "/deposit/" + amount);
@@ -117,6 +107,7 @@ public class ATMController {
         BigDecimal recipientCardBalance = card.get().getBalance();
         atmService.depositCashFromATM(card, amount);
         log.info("Deposit of {} to card {} was successful.", amount, cardNumber);
+        kafkaProducerService.sendMessage("atm-topic", "Deposit of " + amount + " to card " + cardNumber + " successful.");
 
         DepositResponse depositResponse = new DepositResponse(cardNumber, recipientCardBalance.add(amount));
         return ResponseEntity.status(HttpStatus.OK).body(depositResponse);
@@ -142,12 +133,6 @@ public class ATMController {
             @Parameter(description = "Card number", required = true) @RequestParam("cardNumber") String cardNumber,
             @Parameter(description = "Amount to withdraw", required = true) @RequestParam("amount") BigDecimal amount) {
 
-        if (!LuhnsAlgorithm.isCorrectNumber(cardNumber)) {
-            log.error("Invalid credit card number {}", cardNumber);
-            ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "400", "Invalid credit card number.", "/withdraw/" + cardNumber);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
-        }
-
         Optional<BankCardModel> card = bankCardRepository.findByCardNumber(cardNumber);
         if (card.isEmpty()) {
             log.error("Card not found for number: {}", cardNumber);
@@ -171,6 +156,7 @@ public class ATMController {
 
         atmService.withdrawFromATM(card, amount);
         log.info("Withdrawal of {} from card {} was successful.", amount, cardNumber);
+        kafkaProducerService.sendMessage("atm-topic", "Withdrawal of " + amount + " from card " + cardNumber + " was successful.");
 
         WithdrawResponse response = new WithdrawResponse(cardNumber, amount.toString(), balance.subtract(amount));
         return ResponseEntity.status(HttpStatus.OK).body(response);

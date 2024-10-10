@@ -13,6 +13,6 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class BankCardDTO {
     private String cardNumber;
-    private String pinCode; // Оригинальный 4-значный PIN-код
+    private String pinCode; // Regular 4-pin code
     private BigDecimal balance;
 }

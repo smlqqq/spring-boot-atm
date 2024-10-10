@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface BankCardRepository extends JpaRepository<BankCardModel, Long> {
 
    Optional<BankCardModel> findByCardNumber(String cardNum);
+
 }

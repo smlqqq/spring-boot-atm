@@ -29,8 +29,6 @@ import java.util.List;
 public class ManagerController {
 
     @Autowired
-    private KafkaTemplate<String, Object> kafkaTemplate;
-    @Autowired
     private KafkaProducerService kafkaProducerService;
     @Autowired
     private BankCardRepository bankCardRepository;
@@ -78,7 +76,6 @@ public class ManagerController {
         } else
 
             log.error("Invalid credit card number {}", cardNumber);
-        kafkaProducerService.sendMessage("atm-topic", "Invalid credit card number " + cardNumber);
         ErrorResponse errorResponse = new ErrorResponse(Instant.now(), "404", "Card not found", "/delete/" + cardNumber);
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }

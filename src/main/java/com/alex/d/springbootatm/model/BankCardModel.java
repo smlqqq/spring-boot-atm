@@ -15,6 +15,7 @@ import java.util.Set;
 @Entity
 @Getter
 @Setter
+@NoArgsConstructor
 @Table(name = "atm_accounts")
 @JsonTypeName("Bank card")
 public class BankCardModel {
@@ -49,6 +50,5 @@ public class BankCardModel {
         this.balance = balance;
     }
 
-    public BankCardModel() {}
 }
 
