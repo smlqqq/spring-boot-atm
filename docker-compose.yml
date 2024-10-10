@@ -16,6 +16,7 @@ services:
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_KRAFT_MODE: "true"
       KAFKA_CLUSTER_ID: my-cluster
+      KAFKA_DATA_DIR: /var/lib/kafka/data
     ports:
       - "9092:9092"
     volumes:
@@ -40,6 +41,7 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       - postgres
+      - kafka
 
   postgres:
     image: postgres:13
@@ -53,14 +55,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  flyway:
-    image: flyway/flyway
-    container_name: flyway
-    depends_on:
-      - postgres
-    command: -url=jdbc:postgresql://postgres:5432/bank_db -user=postgres -password=postgres -locations=filesystem:/flyway/sql migrate
-    volumes:
-      - ./src/main/resources/db/migration:/flyway/sql
+#  flyway:
+#    image: flyway/flyway
+#    container_name: flyway
+#    depends_on:
+#      - postgres
+#    command: -url=jdbc:postgresql://postgres:5432/bank_db -user=postgres -password=postgres -locations=filesystem:/flyway/sql migrate
+#    volumes:
+#      - ./src/main/resources/db/migration:/flyway/sql
 
 volumes:
   postgres_data:
